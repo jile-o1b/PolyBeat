@@ -711,25 +711,6 @@
       }
     });
 
-    const taps = [];
-    $('btnTap').addEventListener('click', () => {
-      const now = performance.now();
-      taps.push(now);
-      while (taps.length && now - taps[0] > 4000) taps.shift();
-      if (taps.length >= 2) {
-        const gaps = [];
-        for (let i = 1; i < taps.length; i++) gaps.push(taps[i] - taps[i - 1]);
-        const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-        if (avg > 150) {
-          const beat = currentBeatNo();
-          const tapped = Math.round((60000 / avg) * 100) / 100;
-          Project.setBpmAtBeat(beat, tapped);
-          refreshBpmInput();
-          UI.status(`第 ${beat} 拍起 ${Project.bpmAtBeat(beat)} BPM`);
-        }
-      }
-    });
-
     document.addEventListener('keydown', onKeydown);
   }
 
