@@ -19,7 +19,6 @@
     <button id="btnPlay" class="btn btn-play" title="播放 / 停止（空格）">
       <span class="ico" id="playIco">▶</span><span id="playTxt">播放</span>
     </button>
-    <button id="btnRewind" class="btn btn-icon" title="回到第一页（Home）">⏮</button>
 
     <div class="field">
       <label for="bpm">BPM</label>
@@ -31,8 +30,13 @@
   </div>
 
   <div class="pager">
+    <button id="btnRewind" class="btn btn-icon" title="回到第一页（Home）">⏮</button>
     <button id="pagePrev" class="btn btn-icon" title="上一页（,）">◀</button>
-    <span class="page-ind"><b id="pageNow">1</b> / <span id="pageTotal">1</span> 页</span>
+    <span class="page-ind">
+      <input id="pageNow" class="page-input" type="text" inputmode="numeric" autocomplete="off"
+             spellcheck="false" value="1" title="输入页码后回车跳转" aria-label="当前页">
+      <span class="page-of">/ <span id="pageTotal">1</span> 页</span>
+    </span>
     <button id="pageNext" class="btn btn-icon" title="下一页（.）">▶</button>
     <span class="pager-sep"></span>
     <button id="pageAdd" class="btn btn-mini" title="在末尾新增一页">+ 页</button>

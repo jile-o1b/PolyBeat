@@ -349,7 +349,10 @@ const UI = (function () {
   function renderPageTitle() {
     const st = Project.state;
     el.pageTitle.textContent = `第 ${st.page + 1} 页 · 4 小节 · 16 拍` + (tailOn ? ' · 空拍中' : '');
-    el.pageNow.textContent = String(st.page + 1);
+    // 页码是输入框：正在输入时不要覆盖用户打了一半的数字
+    if (document.activeElement !== el.pageNow) {
+      el.pageNow.value = String(st.page + 1);
+    }
     el.pageTotal.textContent = String(Project.pageCount());
   }
 

@@ -275,6 +275,33 @@
     $('pagePrev').addEventListener('click', () => jumpToPage(Project.state.page - 1));
     $('pageNext').addEventListener('click', () => jumpToPage(Project.state.page + 1));
 
+    // 页码输入框：输入数字回车（或失焦）跳到那一页
+    const commitPageInput = () => {
+      const raw = $('pageNow').value.replace(/[^\d]/g, '');
+      const total = Project.pageCount();
+      const target = Math.max(1, Math.min(total, raw ? parseInt(raw, 10) : 1));
+      $('pageNow').value = String(Project.state.page + 1);
+      if (target - 1 !== Project.state.page) jumpToPage(target - 1);
+    };
+    $('pageNow').addEventListener('change', commitPageInput);
+    $('pageNow').addEventListener('blur', () => {
+      $('pageNow').value = String(Project.state.page + 1);   // 没改成合法页就还原
+    });
+    $('pageNow').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commitPageInput();
+        $('pageNow').blur();
+      } else if (e.key === 'Escape') {
+        $('pageNow').value = String(Project.state.page + 1);
+        $('pageNow').blur();
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const d = e.key === 'ArrowUp' ? 1 : -1;
+        jumpToPage(Project.state.page + d);
+      }
+    });
+
     $('pageAdd').addEventListener('click', () => {
       Project.pushUndo();
       Project.addPage();
