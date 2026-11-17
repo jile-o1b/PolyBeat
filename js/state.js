@@ -11,7 +11,7 @@ const Project = (function () {
     pages: [],
     page: 0,
     sel: null,          // 当前页里的方块下标 0..15
-    master: 0.9,
+    hitVol: 0.9,        // 打击音量（只影响打击音，不影响伴奏）
   };
 
   const listeners = [];
@@ -256,7 +256,7 @@ const Project = (function () {
   function snapshot() {
     return JSON.stringify({
       tempos: state.tempos,
-      master: state.master,
+      hitVol: state.hitVol,
       pages: state.pages,
     });
   }
@@ -275,7 +275,7 @@ const Project = (function () {
     const o = JSON.parse(prev);
     state.tempos = Array.isArray(o.tempos) && o.tempos.length ? o.tempos : [{ beat: 1, offset: 0, bpm: 100 }];
     ensureStartTempo();
-    state.master = o.master;
+    state.hitVol = o.hitVol;
     state.pages = o.pages;
     durCache = null;
     if (state.page >= state.pages.length) state.page = state.pages.length - 1;
@@ -390,8 +390,8 @@ const Project = (function () {
   function setBpm(v) {
     return setTempo(1, 0, v);
   }
-  function setMaster(v) {
-    state.master = Math.max(0, Math.min(1, v));
+  function setHitVolume(v) {
+    state.hitVol = Math.max(0, Math.min(1, v));
   }
 
   /* ------------------------------------------------------------ 序列化 */
@@ -401,7 +401,7 @@ const Project = (function () {
       app: 'PolyBeat',
       version: 4,
       tempos: state.tempos,
-      master: state.master,
+      hitVol: state.hitVol,
       page: state.page,
       pages: state.pages,
     };
@@ -455,7 +455,7 @@ const Project = (function () {
     const pages = Array.isArray(raw.pages) ? raw.pages.slice(0, 64) : [];
     if (!pages.length) throw new Error('工程文件里没有页面');
 
-    state.master = Math.max(0, Math.min(1, Number(raw.master) || 0.9));
+    state.hitVol = Math.max(0, Math.min(1, raw.hitVol != null ? Number(raw.hitVol) : (Number(raw.master) || 0.9)));
     state.pages = pages.map((page) => {
       const blocks = Array.isArray(page) ? page.slice(0, BLOCKS_PER_PAGE) : [];
       const out = blocks.map(sanitizeBlock);
@@ -517,7 +517,7 @@ const Project = (function () {
   /** 全新的空工程：一页 16 个空方块，每个 1 个音符点、都没有击打 */
   function newProject() {
     state.tempos = [{ beat: 1, offset: 0, bpm: 100 }];
-    state.master = 0.9;
+    state.hitVol = 0.9;
     state.pages = [
       Array.from({ length: BLOCKS_PER_PAGE }, () => emptyBlock()),
     ];
@@ -547,7 +547,7 @@ const Project = (function () {
     select, toggleSlot, setCount, setVel, fillBlock,
     copyBlock, pasteBlock, hasClipboard,
     gotoPage, addPage, dupPage, delPage,
-    setBpm, setMaster,
+    setBpm, setHitVolume,
     toJSON, fromJSON, loadPreset, newProject, loadChart, clearAll,
   };
 })();

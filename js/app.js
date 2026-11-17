@@ -235,8 +235,8 @@
     const st = Project.state;
     refreshBpmInput();
     UI.renderTempoList();
-    $('masterVol').value = String(Math.round(st.master * 100));
-    $('masterVolVal').textContent = String(Math.round(st.master * 100));
+    $('hitVol').value = String(Math.round(st.hitVol * 100));
+    $('hitVolVal').textContent = String(Math.round(st.hitVol * 100));
     UI.renderPageTitle();
     $('pagePrev').disabled = st.page <= 0;
     $('pageNext').disabled = st.page >= Project.pageCount() - 1;
@@ -294,10 +294,10 @@
       UI.toast('已删除该页');
     });
 
-    $('masterVol').addEventListener('input', (e) => {
-      Project.setMaster(Number(e.target.value) / 100);
-      $('masterVolVal').textContent = e.target.value;
-      Synth.setMaster(Project.state.master);
+    $('hitVol').addEventListener('input', (e) => {
+      Project.setHitVolume(Number(e.target.value) / 100);
+      $('hitVolVal').textContent = e.target.value;
+      Synth.setHitVolume(Project.state.hitVol);
     });
 
     $('preset').addEventListener('change', (e) => {
@@ -317,7 +317,7 @@
       Project.loadPreset(key);
       musicOffset = 0;
       e.target.value = '';
-      Synth.setMaster(Project.state.master);
+      Synth.setHitVolume(Project.state.hitVol);
       UI.buildPresetOptions(null);
       UI.toast(`已载入「${PRESETS[key].name}」`);
     });
@@ -399,7 +399,7 @@
       stop();
       Project.pushUndo();
       Project.loadChart(result);
-      Synth.setMaster(Project.state.master);
+      Synth.setHitVolume(Project.state.hitVol);
       musicOffset = result.stats.offsetSec || 0;
 
       const s = result.stats;
@@ -616,7 +616,7 @@
           try {
             stop();
             Project.fromJSON(obj);
-            Synth.setMaster(Project.state.master);
+            Synth.setHitVolume(Project.state.hitVol);
             musicOffset = 0;
             pkgCharts = null;
             UI.buildPresetOptions(null);
@@ -837,7 +837,7 @@
     wire();
     bind();
     syncControls();
-    Synth.setMaster(Project.state.master);
+    Synth.setHitVolume(Project.state.hitVol);
     UI.renderPageTitle();
 
     if (!canStore) {

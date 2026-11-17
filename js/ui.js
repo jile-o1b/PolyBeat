@@ -63,8 +63,8 @@ const UI = (function () {
     el.pageNow = document.getElementById('pageNow');
     el.pageTotal = document.getElementById('pageTotal');
     el.preset = document.getElementById('preset');
-    el.masterVol = document.getElementById('masterVol');
-    el.masterVolVal = document.getElementById('masterVolVal');
+    el.hitVol = document.getElementById('hitVol');
+    el.hitVolVal = document.getElementById('hitVolVal');
   }
 
   /* ---------------------------------------------------------------- 图例 */

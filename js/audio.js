@@ -6,10 +6,11 @@
 
 const Synth = (function () {
   let ctx = null;
-  let master, transport, comp;
+  let hitBus, transport, comp;
   let buffer = null;
   let loading = null;
   let peak = 0;
+  let hitVol = 0.9;
 
   let musicBuffer = null;
   let musicGain = null;
@@ -30,14 +31,15 @@ const Synth = (function () {
     comp.attack.value = 0.003;
     comp.release.value = 0.14;
 
-    master = ctx.createGain();
-    master.gain.value = 0.9;
+    // 打击音总线：只影响打击音，伴奏走自己的音量
+    hitBus = ctx.createGain();
+    hitBus.gain.value = hitVol;
 
     transport = ctx.createGain();
     transport.gain.value = 1;
 
-    transport.connect(master);
-    master.connect(comp);
+    hitBus.connect(transport);
+    transport.connect(comp);
     comp.connect(ctx.destination);
     return ctx;
   }
@@ -102,7 +104,7 @@ const Synth = (function () {
     g.gain.value = v * 0.92;
 
     src.connect(g);
-    g.connect(transport);
+    g.connect(hitBus);
     src.start(Math.max(time, ctx.currentTime));
     return true;
   }
@@ -188,7 +190,7 @@ const Synth = (function () {
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
 
     o.connect(g);
-    g.connect(transport);
+    g.connect(transport);   // 节拍器跟走带走，不跟打击音量走
     o.start(t);
     o.stop(t + 0.06);
   }
@@ -211,9 +213,11 @@ const Synth = (function () {
       if (ctx.state === 'suspended') return ctx.resume();
       return Promise.resolve();
     },
-    setMaster(v) {
+    /** 打击音量：只影响 hit.wav 那条总线，伴奏不受影响 */
+    setHitVolume(v) {
       ensure();
-      master.gain.setTargetAtTime(Math.max(0, Math.min(1, v)), ctx.currentTime, 0.02);
+      hitVol = Math.max(0, Math.min(1, v));
+      hitBus.gain.setTargetAtTime(hitVol, ctx.currentTime, 0.02);
     },
     setRunning(on) {
       ensure();
