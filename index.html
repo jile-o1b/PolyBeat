@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PolyBeat · 多点节拍编辑器</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="brand-text"><b>PolyBeat</b><small>多点节拍编辑器</small></div>
+  </div>
+
+  <div class="transport">
+    <button id="btnPlay" class="btn btn-play" title="播放 / 停止（空格）">
+      <span class="ico" id="playIco">▶</span><span id="playTxt">播放</span>
+    </button>
+    <button id="btnRewind" class="btn btn-icon" title="回到第一页（Home）">⏮</button>
+
+    <div class="field">
+      <label for="bpm">BPM</label>
+      <input id="bpm" type="number" min="4" max="2000" step="0.01" value="100">
+      <button id="btnTempo" class="btn btn-mini" title="BPM 列表：可以在指定拍数处变速">列表</button>
+    </div>
+    <button id="btnTap" class="btn btn-mini" title="连点四次测速">TAP</button>
+    <button id="btnMetro" class="btn btn-icon" title="节拍器开关" aria-pressed="false">♩</button>
+  </div>
+
+  <div class="pager">
+    <button id="pagePrev" class="btn btn-icon" title="上一页（,）">◀</button>
+    <span class="page-ind"><b id="pageNow">1</b> / <span id="pageTotal">1</span> 页</span>
+    <button id="pageNext" class="btn btn-icon" title="下一页（.）">▶</button>
+    <span class="pager-sep"></span>
+    <button id="pageAdd" class="btn btn-mini" title="在末尾新增一页">+ 页</button>
+    <button id="pageDup" class="btn btn-mini" title="复制当前页">复制页</button>
+    <button id="pageDel" class="btn btn-mini btn-danger" title="删除当前页">删页</button>
+  </div>
+
+  <div class="actions">
+    <select id="preset" class="preset-select" title="载入示例">
+      <option value="">示例节奏…</option>
+    </select>
+    <button id="btnMusic" class="btn btn-ghost" title="导入音乐（mp3 / ogg / wav / m4a…），和方块同步播放">音乐</button>
+    <button id="btnSave" class="btn btn-ghost" title="导出工程 JSON">保存</button>
+    <button id="btnLoad" class="btn btn-ghost" title="导入：PolyBeat 工程、RPE / Phigros / Rizline 谱面、PEZ 压缩包、图片（当背景）——也可以直接把文件拖进窗口">导入</button>
+    <button id="btnMidi" class="btn btn-ghost" title="导出标准 MIDI">MIDI</button>
+  </div>
+</header>
+
+<main class="workspace">
+  <section class="stage">
+    <div class="stage-bg" id="stageBg" aria-hidden="true"></div>
+    <div class="stage-head">
+      <span id="pageTitle" class="page-title">第 1 页 · 4 小节 · 16 拍</span>
+      <span id="storeBadge" class="store-badge" hidden title="以本地文件方式打开时浏览器可能不提供持久存储，请用「保存」导出工程">自动保存不可用</span>
+      <div class="legend" id="legend" title="方块颜色 = 这一拍里的音符数量"></div>
+    </div>
+
+    <div class="board-wrap" id="boardWrap">
+      <div class="board-col" id="boardCol">
+        <div class="beat-heads" id="beatHeads"></div>
+        <div class="board-row">
+          <div class="bar-labels" id="barLabels"></div>
+          <div class="board-stage" id="boardStage">
+            <div class="board-strip" id="boardStrip">
+              <div class="board" data-slot="-3" aria-hidden="true"></div>
+              <div class="board" data-slot="-2" aria-hidden="true"></div>
+              <div class="board" data-slot="-1" aria-hidden="true"></div>
+              <div id="board" class="board" role="grid" aria-label="方块节拍网格"></div>
+              <div class="board" data-slot="1" aria-hidden="true"></div>
+              <div class="board" data-slot="2" aria-hidden="true"></div>
+              <div class="board" data-slot="3" aria-hidden="true"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage-foot">
+      <span id="statusMsg" class="status-msg"></span>
+      <span class="kbd-hint"><kbd>点方块</kbd> 选中这一拍</span>
+      <span class="kbd-hint"><kbd>滚轮</kbd> 改音符数量</span>
+      <span class="kbd-hint"><kbd>空格</kbd> 播放</span>
+      <span class="kbd-hint"><kbd>方向键</kbd> 移动</span>
+      <span class="kbd-hint"><kbd>数字 1–8</kbd> 设音符数</span>
+    </div>
+  </section>
+</main>
+
+<section class="editor" id="editor">
+  <div class="note-pad-wrap">
+    <div id="notePad" class="note-pad is-empty"></div>
+    <span id="padCap" class="pad-cap">未选中方块</span>
+  </div>
+
+  <div class="ed-fields">
+    <div class="ed-line">
+      <span id="edPos" class="ed-pos">点上方一个方块，在这里设置它的音符</span>
+      <span id="edBadge" class="ed-badge" hidden>编辑中</span>
+    </div>
+
+    <div class="ed-line">
+      <div class="ed-field">
+        <label>这一拍的音符数量</label>
+        <div id="countPicker" class="count-picker"></div>
+      </div>
+    </div>
+
+    <div class="ed-line">
+      <div class="ed-field ed-grow">
+        <label for="insVel">力度 <b id="insVelVal">85</b></label>
+        <input id="insVel" type="range" min="10" max="100" step="1" value="85">
+      </div>
+    </div>
+  </div>
+
+  <div class="ed-actions">
+    <button id="btnAllOn" class="btn btn-mini">全击打</button>
+    <button id="btnAllOff" class="btn btn-mini">全不击打</button>
+    <button id="btnInvert" class="btn btn-mini">反转</button>
+    <button id="btnCopyBlock" class="btn btn-mini">复制方块</button>
+    <button id="btnPasteBlock" class="btn btn-mini">粘贴</button>
+    <button id="btnClearBlock" class="btn btn-mini btn-danger">清空</button>
+  </div>
+
+  <div class="ed-master">
+    <div class="ed-field">
+      <label for="masterVol">总音量 <b id="masterVolVal">90</b></label>
+      <input id="masterVol" type="range" min="0" max="100" step="1" value="90">
+    </div>
+    <div class="ed-field" id="musicVolWrap" hidden>
+      <label for="musicVol" title="音乐音量">音乐 <b id="musicVolVal">70</b></label>
+      <input id="musicVol" type="range" min="0" max="100" step="1" value="70">
+    </div>
+    <dl class="mini-stats">
+      <div><dt>页</dt><dd id="statPages">1</dd></div>
+      <div><dt>击</dt><dd id="statHits">0</dd></div>
+      <div><dt>长</dt><dd id="statDur">0.0s</dd></div>
+    </dl>
+  </div>
+</section>
+
+<div id="tempoPanel" class="tempo-panel" hidden>
+  <div class="tp-head">
+    <b>BPM 列表</b>
+    <span class="tp-tip">位置写法 1:1/2 = 第 1 拍的 1/2 处</span>
+    <button id="tempoClose" class="btn btn-mini tp-close" title="关闭">×</button>
+  </div>
+
+  <div class="tp-add">
+    <input id="tempoPos" type="text" placeholder="1:1/2" spellcheck="false" autocomplete="off">
+    <input id="tempoBpm" type="number" min="4" max="2000" step="0.01" placeholder="BPM">
+    <button id="tempoAdd" class="btn btn-mini">添加 / 更新</button>
+    <button id="tempoHere" class="btn btn-mini" title="填入当前选中拍的位置与速度">当前拍</button>
+  </div>
+
+  <ul id="tempoList" class="tp-list"></ul>
+
+  <div class="tp-foot">
+    <span>第一项是整曲起始速度，不能删</span>
+    <span id="tempoCount" class="tp-count"></span>
+  </div>
+</div>
+
+<div id="chartPicker" class="picker" hidden>
+  <div class="picker-mask"></div>
+  <div class="picker-box" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+    <div class="picker-head">
+      <b id="pickerTitle">选择要解析的谱面</b>
+      <span id="pickerSub" class="picker-sub"></span>
+    </div>
+    <div id="pickerList" class="picker-list"></div>
+    <div class="picker-foot">
+      <span class="picker-hint">选中的谱面会解析成方块，包里的音乐会一起导入</span>
+      <button id="pickerCancel" class="btn btn-mini">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<input id="fileInput" type="file" accept=".json,.rpe,.pec,.pez,.zip,.txt,.png,.jpg,.jpeg,.webp,.bmp,.gif,application/json,image/*" hidden>
+<input id="musicInput" type="file" accept="audio/*,.mp3,.ogg,.wav,.m4a,.flac,.aac,.opus" hidden>
+
+<script src="js/data.js"></script>
+<script src="js/hit.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/state.js"></script>
+<script src="js/chart.js"></script>
+<script src="js/zip.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/midi.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
