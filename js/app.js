@@ -711,6 +711,25 @@
       }
     });
 
+    // 谱面空白处滚轮翻页（在方块上滚轮还是改音符数量）
+    const stageEl = document.querySelector('.stage');
+    const boardBox = document.getElementById('boardStage');
+    let wheelAt = 0;
+    stageEl.addEventListener('wheel', (e) => {
+      if (e.target.closest('input, select, button, a, textarea, .tempo-panel, .picker')) return;
+      // 用棋盘静止时的框判断：翻页动画里滑动的方块不算“在方块上”
+      const r = boardBox.getBoundingClientRect();
+      const onBoard = e.clientX >= r.left && e.clientX <= r.right &&
+        e.clientY >= r.top && e.clientY <= r.bottom;
+      if (onBoard && e.target.closest('.block')) return;
+      if (!e.deltaY) return;
+      e.preventDefault();
+      const now = performance.now();
+      if (now < wheelAt) return;                                     // 触控板惯性只翻一页
+      wheelAt = now + 200;
+      jumpToPage(Project.state.page + (e.deltaY > 0 ? 1 : -1));
+    }, { passive: false });
+
     document.addEventListener('keydown', onKeydown);
   }
 
