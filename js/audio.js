@@ -93,15 +93,14 @@ const Synth = (function () {
     return loading;
   }
 
-  /** 排一次击打：time 是 AudioContext 时间 */
-  function play(time, vel) {
+  /** 排一次击打：time 是 AudioContext 时间（音量交给打击音总线） */
+  function play(time) {
     if (!ctx || !buffer) return false;
     const src = ctx.createBufferSource();
     src.buffer = buffer;
 
     const g = ctx.createGain();
-    const v = Math.max(0.02, Math.min(1, vel == null ? 0.85 : vel));
-    g.gain.value = v * 0.92;
+    g.gain.value = 0.85 * 0.92;
 
     src.connect(g);
     g.connect(hitBus);
@@ -204,8 +203,8 @@ const Synth = (function () {
     startMusic,
     stopMusic,
     setMusicVolume,
-    preview(vel) {
-      return load().then(() => play(ensure().currentTime + 0.01, vel));
+    preview() {
+      return load().then(() => play(ensure().currentTime + 0.01));
     },
     now() { return ctx ? ctx.currentTime : 0; },
     resume() {

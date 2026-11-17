@@ -557,8 +557,6 @@ input[type="range"]::-moz-range-thumb{
   white-space: nowrap;
 }
 .ed-field > label b{ color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
-.ed-grow{ flex: 0 1 auto; }
-.ed-grow input[type="range"]{ width: 220px; }
 
 .wide-select{
   height: 28px; padding: 0 8px; min-width: 96px;

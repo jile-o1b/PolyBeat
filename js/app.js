@@ -65,7 +65,7 @@
         for (let s = 0; s < blk.n; s++) {
           if (!blk.on[s]) continue;
           const at = t + Project.timeInBeat(segs, s / blk.n);
-          Synth.play(at, blk.vel);
+          Synth.play(at);
           Transport.events.push({ t: at, kind: 'slot', p: Math.floor(beat0 / Project.BLOCKS_PER_PAGE), i, s });
         }
       }

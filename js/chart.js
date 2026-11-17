@@ -191,7 +191,7 @@ const ChartImport = (function () {
 
   /**
    * 把松散的音符时间压成「每拍几个音符 + 哪些要击打」
-   * 返回 pages: [ [{n, on[], vel}] × 16 ] × N
+   * 返回 pages: [ [{n, on[]}] × 16 ] × N
    */
   function build(chart) {
     const sorted = chart.notes
@@ -238,7 +238,7 @@ const ChartImport = (function () {
         const beat = p * PAGE_BLOCKS + i;
         const offsets = buckets.get(beat);
         if (!offsets || !offsets.length) {
-          page.push({ n: 1, on: [false], vel: 0.85 });
+          page.push({ n: 1, on: [false] });
           continue;
         }
 
@@ -262,7 +262,7 @@ const ChartImport = (function () {
 
         const on = new Array(chosen.n).fill(false);
         chosen.slots.forEach((k) => { on[k] = true; });
-        page.push({ n: chosen.n, on, vel: 0.85 });
+        page.push({ n: chosen.n, on });
         usedSlots += chosen.slots.size;
         noteCount += chosen.slots.size;
       }

@@ -36,8 +36,6 @@ const UI = (function () {
     el.edPos = document.getElementById('edPos');
     el.edBadge = document.getElementById('edBadge');
     el.countPicker = document.getElementById('countPicker');
-    el.insVel = document.getElementById('insVel');
-    el.insVelVal = document.getElementById('insVelVal');
     el.statPages = document.getElementById('statPages');
     el.statHits = document.getElementById('statHits');
     el.statDur = document.getElementById('statDur');
@@ -183,7 +181,7 @@ const UI = (function () {
     const page = Project.pageAt(pageIdx) || [];
     container.innerHTML = '';
     for (let i = 0; i < BLOCKS; i++) {
-      const blk = page[i] || { n: 1, on: [false], vel: 0.85 };
+      const blk = page[i] || { n: 1, on: [false] };
       const { card, stage } = makeCard(blk);
       fillDots(stage, blk);
       container.appendChild(card);
@@ -432,9 +430,6 @@ const UI = (function () {
     el.countPicker.querySelectorAll('.count-btn').forEach((b) => {
       b.classList.toggle('is-on', Number(b.dataset.n) === blk.n);
     });
-
-    el.insVel.value = String(Math.round(blk.vel * 100));
-    el.insVelVal.textContent = String(Math.round(blk.vel * 100));
   }
 
   function updateStats() {
@@ -685,7 +680,7 @@ const UI = (function () {
     if (!blk) return;
     const on = blk.on.some((v, s) => v && s < blk.n);
     if (!on) return;
-    Synth.preview(blk.vel * 0.9);
+    Synth.preview();
   }
 
   function bindEditor() {
@@ -708,14 +703,6 @@ const UI = (function () {
       Project.toggleSlot(i, Number(btn.dataset.s));
       const blk = Project.blockAt(Project.state.page, i);
       if (blk.on[Number(btn.dataset.s)]) previewBlock(i);
-    });
-
-    el.insVel.addEventListener('pointerdown', () => Project.pushUndo());
-    el.insVel.addEventListener('input', () => {
-      const i = Project.state.sel;
-      if (i == null) return;
-      Project.setVel(i, Number(el.insVel.value) / 100);
-      el.insVelVal.textContent = el.insVel.value;
     });
 
     const doFill = (mode) => () => {

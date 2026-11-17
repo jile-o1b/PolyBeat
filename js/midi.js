@@ -33,7 +33,7 @@ const MidiExport = (function () {
       page.forEach((blk, i) => {
         const beatTick = (p * BLOCKS + i) * PPQ;
         const slotTick = PPQ / blk.n;
-        const vel = Math.max(1, Math.min(127, Math.round(blk.vel * 127)));
+        const vel = 100;                 // 没有逐拍力度了，统一给个中等强度
         const len = Math.max(20, slotTick * 0.45);
 
         for (let s = 0; s < blk.n; s++) {

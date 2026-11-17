@@ -27,25 +27,24 @@ function clamp01(v) {
 }
 
 /* --------------------------------------------------------------------------
-   方块：{ n, on[], vel }
+   方块：{ n, on[] }
    n     这一拍分成几份（1–8）
    on    n 个布尔值，true = 击打
-   vel   这一拍的力度 0.05–1
    -------------------------------------------------------------------------- */
-function makeBlock(n, pattern, vel) {
+function makeBlock(n, pattern) {
   const count = Math.max(1, Math.min(MAX_SLOTS, n | 0 || 1));
   const on = [];
   for (let i = 0; i < count; i++) on.push(!!(pattern && pattern[i] === 'x'));
-  return { n: count, on, vel: clamp01(vel == null ? 0.85 : vel) };
+  return { n: count, on };
 }
 
 function emptyBlock() {
-  return makeBlock(1, '.', 0.85);
+  return makeBlock(1, '.');
 }
 
 /** 简写：b(2, 'x.') —— 一拍两音，只打前半 */
-function b(n, pattern, vel) {
-  return makeBlock(n, pattern, vel);
+function b(n, pattern) {
+  return makeBlock(n, pattern);
 }
 
 function blockHits(block) {

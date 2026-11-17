@@ -308,14 +308,6 @@ const Project = (function () {
     return changed;
   }
 
-  function setVel(i, v) {
-    const blk = blockAt(state.page, i);
-    if (!blk) return false;
-    blk.vel = clamp01(v);
-    emit('block', { p: state.page, i });
-    return true;
-  }
-
   function fillBlock(i, mode) {
     const blk = blockAt(state.page, i);
     if (!blk) return;
@@ -340,7 +332,6 @@ const Project = (function () {
     blk.inst = clipboard.inst;
     blk.n = clipboard.n;
     blk.on = clipboard.on.slice();
-    blk.vel = clipboard.vel;
     emit('block', { p: state.page, i, resized: true });
     return true;
   }
@@ -416,8 +407,7 @@ const Project = (function () {
     return {
       n,
       on: out,
-      vel: clamp01(raw.vel),
-    };
+      };
   }
 
   function sanitizeTempos(raw, beats) {
@@ -544,7 +534,7 @@ const Project = (function () {
     setTempo, removeTempo, setBpmAtBeat, parseTempoPos, formatTempoPos, clampBpm,
     countHits, countActiveBlocks,
     snapshot, pushUndo, canUndo, undo,
-    select, toggleSlot, setCount, setVel, fillBlock,
+    select, toggleSlot, setCount, fillBlock,
     copyBlock, pasteBlock, hasClipboard,
     gotoPage, addPage, dupPage, delPage,
     setBpm, setHitVolume,
