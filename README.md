@@ -8,6 +8,32 @@
 
 如果浏览器以本地文件方式打开且禁用了持久存储，工具栏会出现「自动保存不可用」提示，此时请用 **保存** 导出工程文件。
 
+## 在线版（GitHub Pages）
+
+纯静态页面，不需要构建，仓库里直接就能托管。
+
+仓库：<https://github.com/jile-o1b/PolyBeat>　分支：`main`　`index.html` 在根目录。
+
+开启步骤：
+
+1. 打开仓库的 **Settings** → 左侧 **Pages**；
+2. **Source** 选 `Deploy from a branch`；
+3. **Branch** 选 `main`，目录选 `/ (root)`，点 **Save**；
+4. 等 1–2 分钟（Actions 里能看到 `pages build and deployment`），然后访问：
+
+   **https://jile-o1b.github.io/PolyBeat/**
+
+之后每次 `git push` 到 `main`，Pages 会在 1 分钟左右自动重新发布。
+
+几个和部署有关的细节：
+
+- 所有资源路径都是**相对路径**，所以挂在 `/<仓库名>/` 这种子路径下也能用（已按 `/PolyBeat/` 实测过）；
+- 仓库里放了一个空的 `.nojekyll`，关掉 Jekyll 处理；
+- 页面图标是 `favicon.svg`，不会再有 `/favicon.ico` 的 404；
+- 线上是 `https`，`hit.wav` 会真的走 `fetch` 加载（`file://` 才退回内嵌副本），`localStorage` 也能用，自动保存正常。
+
+如果哪天把页面挪进子目录（比如 `PolyBeat/`），把 Pages 的目录改成 `/docs`（并把文件夹改名为 `docs`），或者写一个 Actions 工作流、在 `upload-pages-artifact` 里指定 `path:` 即可。
+
 ## 默认状态
 
 打开就是**一页 16 个正方形空方块**，每个方块里 1 个音符点（居中一个空心圆，表示还没击打）——选中方块后，在下方面板里点圆点就是一下。想改音符数量，同样在下方面板改。
