@@ -18,6 +18,7 @@
     nextBeat: 0,
     timer: 0,
     events: [],
+    cycle: 0,         // 一轮循环多少拍（可能比谱面长，好让音乐放完）
   };
 
   const LOOKAHEAD = 0.12;
@@ -31,23 +32,42 @@
     return { p: page, i: beat0 % perPage };
   }
 
+  /** 一轮循环多少拍：谱面长度，或音乐放完需要的长度，取大的那个 */
+  function cycleLength() {
+    const chartBeats = Project.totalBeats();
+    if (!Synth.hasMusic || !(Synth.musicDuration > 0)) return chartBeats;
+    const endSec = Synth.musicDuration - musicOffset;
+    if (!(endSec > 0)) return chartBeats;
+    return Math.max(chartBeats, Project.beatAtSeconds(endSec) + 1);
+  }
+
+  function refreshCycle() {
+    Transport.cycle = cycleLength();
+    return Transport.cycle;
+  }
+
   function scheduleBeat(beat0, t) {
     const segs = Project.beatSegments(beat0);
     const dur = Project.timeInBeat(segs, 1);
-    const { p, i } = blockPos(beat0);
-    const blk = Project.blockAt(p, i);
+    const chartBeats = Project.totalBeats();
+    const tail = beat0 >= chartBeats;          // 谱面放完了，只剩空拍
+    const i = beat0 % Project.BLOCKS_PER_PAGE;
 
     Transport.events.push({
-      t, kind: 'beat', p, i, beat: beat0,
+      t, kind: 'beat', beat: beat0, tail, i,
+      p: tail ? -1 : Math.floor(beat0 / Project.BLOCKS_PER_PAGE),
       bpm: Project.bpmAtBeat(beat0 + 1),
     });
 
-    if (blk) {
-      for (let s = 0; s < blk.n; s++) {
-        if (!blk.on[s]) continue;
-        const at = t + Project.timeInBeat(segs, s / blk.n);
-        Synth.play(at, blk.vel);
-        Transport.events.push({ t: at, kind: 'slot', p, i, s });
+    if (!tail && i >= 0) {
+      const blk = Project.blockAt(Math.floor(beat0 / Project.BLOCKS_PER_PAGE), i);
+      if (blk) {
+        for (let s = 0; s < blk.n; s++) {
+          if (!blk.on[s]) continue;
+          const at = t + Project.timeInBeat(segs, s / blk.n);
+          Synth.play(at, blk.vel);
+          Transport.events.push({ t: at, kind: 'slot', p: Math.floor(beat0 / Project.BLOCKS_PER_PAGE), i, s });
+        }
       }
     }
 
@@ -57,7 +77,7 @@
 
   function scheduler() {
     const now = Synth.now();
-    const total = Project.totalBeats();
+    const total = Math.max(1, Transport.cycle || Project.totalBeats());
     let guard = 0;
     while (Transport.nextBeat < now + LOOKAHEAD && guard++ < 128) {
       const beat0 = Transport.beat % total;
@@ -77,11 +97,17 @@
       const ev = Transport.events.shift();
       if (ev.kind === 'beat') {
         Transport.lastBeat = ev.beat;
-        if (ev.p !== Project.state.page) {
-          Project.gotoPage(ev.p);
-          UI.resetPlayhead();
+        if (ev.tail) {
+          // 谱面放完了：停在最后一页，不放高亮，等音乐放完
+          UI.setTail(true);
+        } else {
+          UI.setTail(false);
+          if (ev.p !== Project.state.page) {
+            Project.gotoPage(ev.p);
+            UI.resetPlayhead();
+          }
+          UI.setPlayingBlock(ev.i);
         }
-        UI.setPlayingBlock(ev.i);
         UI.setBpmInput(ev.bpm);
       } else {
         UI.flashDot(ev.i, ev.s);
@@ -99,6 +125,8 @@
       .then(() => Synth.load())
       .then(() => {
         Synth.setRunning(true);
+        UI.setTail(false);
+        refreshCycle();
         Transport.playing = true;
         Transport.beat = Project.state.page * Project.BLOCKS_PER_PAGE;
         Transport.lastBeat = Transport.beat;
@@ -134,6 +162,7 @@
     Transport.events = [];
     Synth.setRunning(false);
     Synth.stopMusic();
+    UI.setTail(false);
     UI.resetPlayhead();
     $('btnPlay').classList.remove('is-playing');
     $('playIco').textContent = '▶';
@@ -152,6 +181,7 @@
       Transport.lastBeat = Transport.beat;
       Transport.events = [];
       Transport.nextBeat = Synth.now() + 0.06;
+      UI.setTail(false);
     }
     Project.gotoPage(target);
     refreshBpmInput();
@@ -350,9 +380,11 @@
     function loadMusicFile(file) {
       const reader = new FileReader();
       reader.onload = () => {
+        musicOffset = 0;           // 单独导入的音乐从谱面第 1 拍开始，不带谱面 offset
         Synth.loadMusic(reader.result, file.name)
           .then((info) => {
             showMusicUI(info);
+            refreshCycle();          // 音乐比谱面长的话，循环长度要跟着变
             UI.toast(`已导入音乐「${info.name}」，${info.duration.toFixed(1)} 秒`);
           })
           .catch((err) => {
@@ -754,6 +786,7 @@
       if (type === 'reload' || type === 'pages') {
         UI.reloadHard();
         UI.resetPlayhead();
+        refreshCycle();
         syncControls();
         saveLocal();
       } else if (type === 'page') {
@@ -771,6 +804,7 @@
       } else if (type === 'tempo') {
         refreshBpmInput();
         UI.renderTempoList();
+        refreshCycle();          // 变速会改变"音乐放完要多少拍"
         saveLocal();
       } else if (type === 'tempos') {
         UI.renderTempoList();

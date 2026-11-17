@@ -389,6 +389,8 @@ input[type="range"]::-moz-range-thumb{
   transition: none !important;
 }
 
+/* 谱面放完、等音乐放完的空拍阶段：画面淡一点，表示这段没有音符 */
+.stage.is-tail #board{ opacity: .45; transition: opacity .25s ease; }
 #board{ pointer-events: auto; }
 
 /* ------------------------------------------------------------------ 方块 */

@@ -8,6 +8,7 @@ const UI = (function () {
   let dotEls = [];         // [blockIndex][dotIndex] -> element
   let builtPage = -1;
   let playingBlock = -1;
+  let tailOn = false;      // 谱面放完、等音乐放完的空拍阶段
 
   const BLOCKS = Project.BLOCKS_PER_PAGE;
   const ANIM_MS = 380;
@@ -25,6 +26,7 @@ const UI = (function () {
     el.barLabels = document.getElementById('barLabels');
     el.legend = document.getElementById('legend');
     el.pageTitle = document.getElementById('pageTitle');
+    el.stage = document.querySelector('.stage');
     el.statusMsg = document.getElementById('statusMsg');
     el.toast = document.getElementById('toast');
 
@@ -348,9 +350,19 @@ const UI = (function () {
 
   function renderPageTitle() {
     const st = Project.state;
-    el.pageTitle.textContent = `第 ${st.page + 1} 页 · 4 小节 · 16 拍`;
+    el.pageTitle.textContent = `第 ${st.page + 1} 页 · 4 小节 · 16 拍` + (tailOn ? ' · 空拍中' : '');
     el.pageNow.textContent = String(st.page + 1);
     el.pageTotal.textContent = String(Project.pageCount());
+  }
+
+  /** 谱面放完、等音乐放完的那段：停在最后一页，不打高亮，画面略微变淡 */
+  function setTail(on) {
+    const next = !!on;
+    if (next === tailOn) return;
+    tailOn = next;
+    if (el.stage) el.stage.classList.toggle('is-tail', next);
+    renderPageTitle();
+    if (next) setPlayingBlock(-1);
   }
 
   /* ------------------------------------------------------------ 底部编辑面板 */
@@ -853,7 +865,7 @@ const UI = (function () {
     renderEditor, renderPageTitle, updateStats, layout,
     renderTempoList, setBpmInput,
     showChartPicker, buildPresetOptions, setStageBg,
-    setPlayingBlock, flashDot, resetPlayhead,
+    setPlayingBlock, flashDot, resetPlayhead, setTail,
     toast, status,
     get playingBlock() { return playingBlock; },
   };

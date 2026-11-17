@@ -142,6 +142,19 @@ const Project = (function () {
     return t;
   }
 
+  /** 秒 → 拍（向上取整），超出谱面长度的部分也照算，用来算音乐要放多少拍 */
+  function beatAtSeconds(sec) {
+    if (!(sec > 0)) return 0;
+    const target = sec - 1e-9;      // 容掉浮点累加误差，免得白白多算一拍
+    let t = 0;
+    let b = 0;
+    while (t < target && b < 100000) {
+      t += beatSeconds(b);
+      b++;
+    }
+    return b;
+  }
+
   /* 位置写法：1:1/2 = 第 1 拍的 1/2 处 */
   const OFFSET_NAMES = [
     [0, '0'], [1 / 8, '1/8'], [1 / 6, '1/6'], [1 / 4, '1/4'], [1 / 3, '1/3'],
@@ -527,7 +540,7 @@ const Project = (function () {
     BLOCKS_PER_PAGE,
     pageCount, pageAt, blockAt, currentPage, selectedBlock,
     beatDur, totalBeats, totalDur, slotDur,
-    bpmAtPos, bpmAtBeat, beatSegments, timeInBeat, beatSeconds, secondsAtBeat,
+    bpmAtPos, bpmAtBeat, beatSegments, timeInBeat, beatSeconds, secondsAtBeat, beatAtSeconds,
     setTempo, removeTempo, setBpmAtBeat, parseTempoPos, formatTempoPos, clampBpm,
     countHits, countActiveBlocks,
     snapshot, pushUndo, canUndo, undo,
