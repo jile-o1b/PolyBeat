@@ -446,7 +446,9 @@ const UI = (function () {
   function layout() {
     const wrapW = el.boardWrap.clientWidth;
     const wrapH = el.boardWrap.clientHeight;
-    const size = Math.max(220, Math.min(wrapW - 46, wrapH - 20));
+    // 先按可用空间算，再乘上“大小”滑杆的比例，四周留白
+    const fit = Math.min(wrapW - 46, wrapH - 20) * (Project.state.boardScale || 0.86);
+    const size = Math.max(200, Math.round(fit));
     el.boardCol.style.setProperty('--size', size + 'px');
   }
 

@@ -235,6 +235,8 @@
     const st = Project.state;
     refreshBpmInput();
     UI.renderTempoList();
+    $('boardScale').value = String(Math.round((st.boardScale || 0.86) * 100));
+    $('boardScaleVal').textContent = String(Math.round((st.boardScale || 0.86) * 100));
     $('hitVol').value = String(Math.round(st.hitVol * 100));
     $('hitVolVal').textContent = String(Math.round(st.hitVol * 100));
     UI.renderPageTitle();
@@ -319,6 +321,12 @@
       Project.pushUndo();
       Project.delPage();
       UI.toast('已删除该页');
+    });
+
+    $('boardScale').addEventListener('input', (e) => {
+      Project.setBoardScale(Number(e.target.value) / 100);
+      $('boardScaleVal').textContent = e.target.value;
+      UI.layout();
     });
 
     $('hitVol').addEventListener('input', (e) => {

@@ -12,6 +12,7 @@ const Project = (function () {
     page: 0,
     sel: null,          // 当前页里的方块下标 0..15
     hitVol: 0.9,        // 打击音量（只影响打击音，不影响伴奏）
+    boardScale: 0.86,   // 棋盘占可用空间的比例
   };
 
   const listeners = [];
@@ -385,6 +386,13 @@ const Project = (function () {
     state.hitVol = Math.max(0, Math.min(1, v));
   }
 
+  /** 棋盘大小：可用空间的百分比（0.5–1） */
+  function setBoardScale(v) {
+    const n = Number(v);
+    if (!isFinite(n)) return;
+    state.boardScale = Math.max(0.5, Math.min(1, n));
+  }
+
   /* ------------------------------------------------------------ 序列化 */
 
   function toJSON() {
@@ -393,6 +401,7 @@ const Project = (function () {
       version: 4,
       tempos: state.tempos,
       hitVol: state.hitVol,
+      boardScale: state.boardScale,
       page: state.page,
       pages: state.pages,
     };
@@ -446,6 +455,7 @@ const Project = (function () {
     if (!pages.length) throw new Error('工程文件里没有页面');
 
     state.hitVol = Math.max(0, Math.min(1, raw.hitVol != null ? Number(raw.hitVol) : (Number(raw.master) || 0.9)));
+    if (raw.boardScale != null) setBoardScale(Number(raw.boardScale));
     state.pages = pages.map((page) => {
       const blocks = Array.isArray(page) ? page.slice(0, BLOCKS_PER_PAGE) : [];
       const out = blocks.map(sanitizeBlock);
@@ -537,7 +547,7 @@ const Project = (function () {
     select, toggleSlot, setCount, fillBlock,
     copyBlock, pasteBlock, hasClipboard,
     gotoPage, addPage, dupPage, delPage,
-    setBpm, setHitVolume,
+    setBpm, setHitVolume, setBoardScale,
     toJSON, fromJSON, loadPreset, newProject, loadChart, clearAll,
   };
 })();
