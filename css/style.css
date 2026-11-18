@@ -181,6 +181,77 @@ input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance: none; margi
   background: var(--bg-2); color: var(--dim); cursor: pointer;
 }
 
+/* 播放速度：跟节拍器一排，用自定义下拉（原生 select 的弹层没法做圆角和动画） */
+.speed-picker{ position: relative; }
+
+.speed-btn{
+  height: 26px; padding: 0 7px 0 9px;
+  display: inline-flex; align-items: center; gap: 5px;
+  border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg-2); color: var(--dim); cursor: pointer;
+  font-size: 11.5px; font-variant-numeric: tabular-nums;
+  transition: background .14s, border-color .14s, color .14s;
+}
+.speed-btn:hover{ color: var(--text); border-color: #303a5c; background: var(--panel-2); }
+.speed-btn:focus-visible{ outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(124,92,255,.2); }
+.speed-btn.is-slow{ color: var(--accent-2); border-color: rgba(34,211,238,.4); }
+
+.speed-caret{
+  width: 9px; height: 6px; flex: 0 0 auto;
+  fill: none; stroke: currentColor; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .16s ease;
+  opacity: .75;
+}
+.speed-picker.is-open .speed-caret{ transform: rotate(180deg); }
+
+.speed-menu{
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  min-width: 84px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  box-shadow: 0 16px 34px -14px rgba(0,0,0,.85), 0 1px 0 rgba(255,255,255,.04) inset;
+  z-index: 60;
+
+  /* 收起状态：往上缩一点 + 淡出，打开时反向播 */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-6px) scale(.96);
+  transform-origin: 50% 0;
+  transition: opacity .15s ease, transform .18s cubic-bezier(.22,.9,.3,1), visibility .18s;
+}
+.speed-picker.is-open .speed-menu{
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.speed-opt{
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dim);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: background .1s, color .1s;
+}
+.speed-opt:hover{ background: var(--panel-3); color: var(--text); }
+.speed-opt.is-on{ color: var(--accent-2); }
+.speed-opt.is-on::after{ content: '✓'; float: right; margin-left: 10px; font-size: 10px; }
+
 input[type="range"]{
   -webkit-appearance: none; appearance: none;
   height: 4px; border-radius: 3px; background: var(--panel-3);

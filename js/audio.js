@@ -15,6 +15,10 @@ const Synth = (function () {
   let musicBuffer = null;
   let musicGain = null;
   let musicSrc = null;
+  let musicEl = null;          // 变速播放用（保持音高）
+  let musicURL = null;
+  let musicTimer = 0;
+  let musicSpeed = 1;
   let musicName = '';
   let musicVol = 0.7;
   let musicStarts = 0;
@@ -129,20 +133,35 @@ const Synth = (function () {
         musicBuffer = buf;
         musicName = name || '音乐';
         musicChannel();
+
+        // 变速播放用 <audio>（浏览器会保持音高），1x 仍然走 AudioBuffer 精确排期
+        if (musicURL) URL.revokeObjectURL(musicURL);
+        musicURL = URL.createObjectURL(new Blob([arrayBuffer], { type: mimeOf(musicName) }));
+        musicEl = new Audio(musicURL);
+        musicEl.preload = 'auto';
+        musicEl.preservesPitch = true;
+        musicEl.mozPreservesPitch = true;
+        musicEl.webkitPreservesPitch = true;
+        musicEl.playbackRate = musicSpeed;
+        musicEl.volume = musicVol;
+
         return { duration: buf.duration, name: musicName };
       });
+  }
+
+  function mimeOf(name) {
+    const n = String(name || '').toLowerCase();
+    if (n.endsWith('.wav')) return 'audio/wav';
+    if (n.endsWith('.mp3')) return 'audio/mpeg';
+    if (n.endsWith('.m4a') || n.endsWith('.aac')) return 'audio/mp4';
+    if (n.endsWith('.flac')) return 'audio/flac';
+    return 'audio/ogg';
   }
 
   /** 从音乐的 offsetSec 处开始播；给出 when = AudioContext 时间
       offsetSec 为负表示音乐要比这一拍晚一点进 */
   function startMusic(when, offsetSec) {
     if (!musicBuffer) return false;
-    const ch = musicChannel();
-    stopMusic();
-
-    const src = ctx.createBufferSource();
-    src.buffer = musicBuffer;
-    src.connect(ch);
 
     let startAt = when;
     let off = offsetSec || 0;
@@ -150,8 +169,34 @@ const Synth = (function () {
       startAt = when - off;
       off = 0;
     }
-    const maxOff = Math.max(0, musicBuffer.duration - 0.02);
-    off = Math.max(0, Math.min(maxOff, off));
+    off = Math.max(0, Math.min(Math.max(0, musicBuffer.duration - 0.02), off));
+
+    // 变速时用 <audio>：playbackRate 会保持音高
+    if (musicSpeed !== 1) {
+      if (!musicEl) return false;
+      stopMusic();
+      musicStarts++;
+      const fire = () => {
+        try {
+          musicEl.preservesPitch = true;
+          musicEl.playbackRate = musicSpeed;
+          musicEl.currentTime = off;
+          const p = musicEl.play();
+          if (p && p.catch) p.catch(() => {});
+        } catch (e) { console.warn('音乐启动失败', e); }
+      };
+      const delay = Math.max(0, (startAt - ctx.currentTime) * 1000);
+      if (delay > 8) musicTimer = setTimeout(fire, delay);
+      else fire();
+      return true;
+    }
+
+    const ch = musicChannel();
+    stopMusic();
+
+    const src = ctx.createBufferSource();
+    src.buffer = musicBuffer;
+    src.connect(ch);
 
     try {
       src.start(Math.max(startAt, ctx.currentTime), off);
@@ -165,15 +210,30 @@ const Synth = (function () {
   }
 
   function stopMusic() {
+    if (musicTimer) { clearTimeout(musicTimer); musicTimer = 0; }
+    if (musicEl && !musicEl.paused) {
+      try { musicEl.pause(); } catch (e) { /* 忽略 */ }
+    }
     if (!musicSrc) return;
     try { musicSrc.stop(); } catch (e) { /* 已经停了 */ }
     try { musicSrc.disconnect(); } catch (e) { /* 忽略 */ }
     musicSrc = null;
   }
 
+  /** 播放速度（保持音高）；1 = 原速 */
+  function setMusicSpeed(v) {
+    musicSpeed = Math.max(0.0625, Math.min(4, Number(v) || 1));
+    if (musicEl) {
+      musicEl.preservesPitch = true;
+      musicEl.playbackRate = musicSpeed;
+    }
+    return musicSpeed;
+  }
+
   function setMusicVolume(v) {
     musicVol = Math.max(0, Math.min(1, v));
     if (musicGain) musicGain.gain.setTargetAtTime(musicVol, ctx.currentTime, 0.02);
+    if (musicEl) musicEl.volume = musicVol;
   }
 
   /** 节拍器 */
@@ -203,6 +263,7 @@ const Synth = (function () {
     startMusic,
     stopMusic,
     setMusicVolume,
+    setMusicSpeed,
     preview() {
       return load().then(() => play(ensure().currentTime + 0.01));
     },
@@ -229,6 +290,8 @@ const Synth = (function () {
     get musicName() { return musicName; },
     get musicDuration() { return musicBuffer ? musicBuffer.duration : 0; },
     get musicStarts() { return musicStarts; },
+    get musicSpeed() { return musicSpeed; },
+    get musicPlaying() { return !!(musicEl && !musicEl.paused) || !!musicSrc; },
     get state() { return ctx ? ctx.state : 'closed'; },
   };
 })();

@@ -32,6 +32,12 @@
     return { p: page, i: beat0 % perPage };
   }
 
+  /** 当前播放速度（1 = 原速） */
+  function playSpeed() {
+    const s = Number(Project.state.speed);
+    return isFinite(s) && s > 0 ? s : 1;
+  }
+
   /** 一轮循环多少拍：谱面长度，或音乐放完需要的长度，取大的那个 */
   function cycleLength() {
     const chartBeats = Project.totalBeats();
@@ -48,7 +54,8 @@
 
   function scheduleBeat(beat0, t) {
     const segs = Project.beatSegments(beat0);
-    const dur = Project.timeInBeat(segs, 1);
+    const speed = playSpeed();
+    const dur = Project.timeInBeat(segs, 1) / speed;   // 放慢时每拍占用的真实时间更久
     const chartBeats = Project.totalBeats();
     const tail = beat0 >= chartBeats;          // 谱面放完了，只剩空拍
     const i = beat0 % Project.BLOCKS_PER_PAGE;
@@ -60,13 +67,15 @@
     });
 
     if (!tail && i >= 0) {
-      const blk = Project.blockAt(Math.floor(beat0 / Project.BLOCKS_PER_PAGE), i);
+      const page = Math.floor(beat0 / Project.BLOCKS_PER_PAGE);
+      const blk = Project.blockAt(page, i);
       if (blk) {
         for (let s = 0; s < blk.n; s++) {
           if (!blk.on[s]) continue;
-          const at = t + Project.timeInBeat(segs, s / blk.n);
+          // 拍内的音符位置也要按速度缩放，否则点会按原速打完
+          const at = t + Project.timeInBeat(segs, s / blk.n) / speed;
           Synth.play(at);
-          Transport.events.push({ t: at, kind: 'slot', p: Math.floor(beat0 / Project.BLOCKS_PER_PAGE), i, s });
+          Transport.events.push({ t: at, kind: 'slot', p: page, i, s });
         }
       }
     }
@@ -127,6 +136,7 @@
         Synth.setRunning(true);
         UI.setTail(false);
         refreshCycle();
+        Synth.setMusicSpeed(playSpeed());
         Transport.playing = true;
         Transport.beat = Project.state.page * Project.BLOCKS_PER_PAGE;
         Transport.lastBeat = Transport.beat;
@@ -231,6 +241,18 @@
 
   /* ------------------------------------------------------------ 控件回填 */
 
+  /** 播放速度按钮和菜单的选中态 */
+  function renderSpeedUI() {
+    const v = Number(Project.state.speed) || 1;
+    $('speedLabel').textContent = `${v}x`;
+    $('btnSpeed').classList.toggle('is-slow', v < 1);
+    [...$('speedMenu').children].forEach((b) => {
+      const on = Number(b.dataset.speed) === v;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+  }
+
   function syncControls() {
     const st = Project.state;
     refreshBpmInput();
@@ -239,6 +261,8 @@
     $('boardScaleVal').textContent = String(Math.round((st.boardScale || 0.86) * 100));
     $('hitVol').value = String(Math.round(st.hitVol * 100));
     $('hitVolVal').textContent = String(Math.round(st.hitVol * 100));
+    renderSpeedUI();
+    Synth.setMusicSpeed(playSpeed());
     UI.renderPageTitle();
     $('pagePrev').disabled = st.page <= 0;
     $('pageNext').disabled = st.page >= Project.pageCount() - 1;
@@ -271,6 +295,66 @@
       if (metronomeOn) {
         Synth.resume();
         UI.status('节拍器已开启');
+      }
+    });
+
+    /* 播放速度：自定义下拉（原生 select 的弹层没法做圆角和展开动画） */
+    const speedPicker = $('speedPicker');
+    const speedMenu = $('speedMenu');
+
+    function openSpeedMenu(on) {
+      speedPicker.classList.toggle('is-open', on);
+      $('btnSpeed').setAttribute('aria-expanded', String(on));
+      if (on) {
+        const cur = speedMenu.querySelector('.speed-opt.is-on') || speedMenu.querySelector('.speed-opt');
+        if (cur) cur.focus({ preventScroll: true });
+      }
+    }
+
+    function applySpeed(next) {
+      Project.setSpeed(next);
+      Synth.setMusicSpeed(playSpeed());
+      renderSpeedUI();
+
+      if (Transport.playing) {
+        // 播放中换速度：从当前拍重新对齐，音乐从对应位置接着放
+        const beat = Math.max(0, Transport.lastBeat);
+        Transport.beat = beat;
+        Transport.lastBeat = beat;
+        Transport.events = [];
+        Transport.nextBeat = Synth.now() + 0.06;
+        Synth.stopMusic();
+        if (Synth.hasMusic) {
+          Synth.startMusic(Transport.nextBeat, Project.secondsAtBeat(beat) + musicOffset);
+        }
+      }
+      UI.status(`播放速度 ${next}x`);
+    }
+
+    $('btnSpeed').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openSpeedMenu(!speedPicker.classList.contains('is-open'));
+    });
+
+    speedMenu.addEventListener('click', (e) => {
+      const btn = e.target.closest('.speed-opt');
+      if (!btn) return;
+      applySpeed(Number(btn.dataset.speed) || 1);
+      openSpeedMenu(false);
+      $('btnSpeed').focus({ preventScroll: true });
+    });
+
+    // 点外面 / 按 Esc 关掉
+    document.addEventListener('pointerdown', (e) => {
+      if (!speedPicker.classList.contains('is-open')) return;
+      if (e.target.closest('#speedPicker')) return;
+      openSpeedMenu(false);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && speedPicker.classList.contains('is-open')) {
+        openSpeedMenu(false);
+        $('btnSpeed').focus({ preventScroll: true });
       }
     });
 
