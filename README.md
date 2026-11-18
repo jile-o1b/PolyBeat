@@ -111,6 +111,7 @@ node tools/embed-hit.js
 | RPE 谱面 | JSON 里有 `BPMList` / `META` | 转成方块节拍 + 变速表 |
 | Phigros 官方谱面（fv3） | JSON 里有 `formatVersion`，判定线带 `bpm` | 同上 |
 | Rizline 谱面 | JSON 里有 `lines` + `bPM`（没有 `judgeLineList`） | 同上 |
+| Arcaea 谱面（`.aff`） | 文本里有 `AudioOffset:` / `timing(` | 按 timing 把毫秒换算成拍 |
 | RPE 的 `.pez` / 任意 zip | 开头是 `PK` 或后缀 `.pez` / `.zip` | 解包，把里面的谱面 **和音乐** 一起导入 |
 | 音频文件 | mp3 / ogg / wav / m4a / flac | 只当伴奏，不动谱面 |
 | 图片文件 | png / jpg / webp / bmp / gif | 当谱面背景（模糊 + 压暗） |
@@ -180,13 +181,13 @@ node tools/embed-hit.js
 - **一个方块 = 一拍**，每拍里的音符位置会挑一个能对齐的最小细分数（1–8）：位置在 1/2 就用 2 个音符，1/3 用 3 个，1/4 用 4 个，以此类推。
 - **同一时间的多个音符只算一个**：和弦、多判定线同拍落下的都会被压成一次击打。
 - RPE 里 `isFake = 1` 的假音符不导入（它们在游戏里本来就不发声）。
-- 基准 BPM 取出现次数最多的那条判定线的 bpm；超出 4–2000 的速度会被夹到范围内。
+- 基准 BPM 取出现次数最多的那条判定线的 bpm；超出 4–12000 的速度会被夹到范围内（Arcaea 谱面里常出现 1024 甚至 9999999 这种演出用的假 BPM）。
 - 超过 64 页（1024 拍）会截断，导入提示里会说明。
 - 导入后可以 `Ctrl+Z` 撤回。
 
-**关于精度**：这个模型一拍最多 8 个音符，所以 1/32 拍这类位置对不齐。导入时会选误差最小的细分，并在提示里给出「最大量化偏差」（示例谱面是 4.2% 拍，绝大多数拍是 0）。
+**关于精度**：这个模型一拍最多 8 个音符，所以 1/32 拍这类位置对不齐。导入时会选误差最小的细分，并在提示里给出「最大量化偏差」（示例谱面在 5% 拍上下，也就是 1/8 拍格子的极限，绝大多数拍是 0）。
 
-四份示例谱面的结果：
+五份示例谱面的结果：
 | 谱面 | 原始音符 | 同时刻合并 | 结果 |
 |---|---|---|---|
 | `RPEformat/example.json`（World Vanquisher, 170 BPM, offset -44ms） | 1344 | 283 | 448 拍 / 28 页 / 1059 次击打 |
@@ -194,6 +195,24 @@ node tools/embed-hit.js
 | `fv3format/example.json`（180 BPM） | 595 | 87 | 408 拍 / 26 页 / 497 次击打 |
 | `fv3format/TECHNOPOLIS2085.*.zip` 的 IN 难度 | 820 | 179 | 304 拍 / 19 页 / 641 次击打 + 音乐 139 秒 |
 | `rizformat/example.json`（Rizline, 153.51 BPM） | 751 | 87 | 340 拍 / 22 页 / 664 次击打 |
+| `arcformat/xterfusion/4.aff`（Arcaea ETR, 256 BPM） | 1212 | 358 | 664 拍 / 42 页 / 852 次击打 |
+
+### Arcaea 谱面的对应关系
+
+`.aff` 是纯文本，时间单位是**毫秒**，所以要先用 `timing(...)` 把毫秒换算成拍：
+
+| Arcaea | 这里 |
+|---|---|
+| `AudioOffset:x`（毫秒，正=物件比音乐晚） | 谱面偏移 `-x/1000` 秒 |
+| `timing(ms, bpm, beats)` | 变速点；只有**主时间轴**的 timing 参与算拍（组内流速不同） |
+| `(t,lane)` 地面 Note | 一次击打，拍号 = `t` 按 BPM 积分 |
+| `hold(t1,t2,lane)` | 只算头部一次击打 |
+| `arc(...)` | 只算头部；**首尾相接的弧段会并成一条**（时间差 <10ms、y 相同、x 差 <0.1）；`skyline=true` 的弧不产生判定，跳过 |
+| `[arctap(t),…]` 天空 Note | 每个都算一次击打 |
+| `timinggroup(noinput){…}` | 整段跳过（演出用，不参与判定） |
+| `camera` / `scenecontrol` / `TimingPointDensityFactor` | 忽略 |
+
+弧合并是为了避免一条长弧被拆成几十个 `arc` 段后炸出一堆击打——按接续关系并成一条，只在头上下击。
 
 ### Rizline 谱面的对应关系
 

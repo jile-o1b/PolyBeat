@@ -22,7 +22,7 @@
 
     <div class="field">
       <label for="bpm">BPM</label>
-      <input id="bpm" type="number" min="4" max="2000" step="0.01" value="100">
+      <input id="bpm" type="number" min="4" max="12000" step="0.01" value="100">
       <button id="btnTempo" class="btn btn-mini" title="BPM 列表：可以在指定拍数处变速">列表</button>
     </div>
     <button id="btnMetro" class="btn btn-icon" title="节拍器开关" aria-pressed="false">♩</button>
@@ -172,7 +172,7 @@
 
   <div class="tp-add">
     <input id="tempoPos" type="text" placeholder="1:1/2" spellcheck="false" autocomplete="off">
-    <input id="tempoBpm" type="number" min="4" max="2000" step="0.01" placeholder="BPM">
+    <input id="tempoBpm" type="number" min="4" max="12000" step="0.01" placeholder="BPM">
     <button id="tempoAdd" class="btn btn-mini">添加 / 更新</button>
     <button id="tempoHere" class="btn btn-mini" title="填入当前选中拍的位置与速度">当前拍</button>
   </div>
@@ -201,7 +201,7 @@
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<input id="fileInput" type="file" multiple accept=".json,.rpe,.pec,.pez,.zip,.txt,.png,.jpg,.jpeg,.webp,.bmp,.gif,.mp3,.ogg,.oga,.wav,.m4a,.flac,.aac,.opus,application/json,audio/*,image/*" hidden>
+<input id="fileInput" type="file" multiple accept=".json,.rpe,.pec,.pez,.zip,.aff,.txt,.png,.jpg,.jpeg,.webp,.bmp,.gif,.mp3,.ogg,.oga,.wav,.m4a,.flac,.aac,.opus,application/json,audio/*,image/*" hidden>
 
 <script src="js/data.js"></script>
 <script src="js/hit.js"></script>

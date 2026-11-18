@@ -623,6 +623,14 @@
       return label || fileName;
     }
 
+    /** Arcaea 的 .aff 按文件名里的数字标难度：0 PST / 1 PRS / 2 FTR / 3 BYD / 4 ETR */
+    const AFF_DIFF = ['PST', 'PRS', 'FTR', 'BYD', 'ETR'];
+    function affLabel(fileName) {
+      const m = /(?:^|[\\/])(\d+)\.aff$/i.exec(fileName);
+      const diff = m ? (AFF_DIFF[Number(m[1])] || '') : '';
+      return diff || fileName;          // 弹窗里还有一行文件名，这里只写难度
+    }
+
     async function importZip(file) {
       UI.toast('正在读取压缩包…');
       try {
@@ -632,12 +640,21 @@
 
         const meta = await readZipMeta(bytes, entries);
 
-        // 找出所有「能认成谱面」的 json
+        // 找出所有「能认成谱面」的 json / aff
         const charts = [];
         for (const e of entries) {
-          if (!/\.json$/i.test(e.name)) continue;
+          const isAff = /\.aff$/i.test(e.name);
+          if (!isAff && !/\.json$/i.test(e.name)) continue;
+          let text = '';
+          try { text = await zipText(bytes, e); } catch (err) { continue; }
+          if (isAff) {
+            if (!ChartImport.looksLikeAFF(text)) continue;
+            try { ChartImport.parseAFF(text); } catch (err) { continue; }
+            charts.push({ file: e.name, entry: e, label: affLabel(e.name) });
+            continue;
+          }
           let obj;
-          try { obj = JSON.parse(await zipText(bytes, e)); } catch (err) { continue; }
+          try { obj = JSON.parse(text); } catch (err) { continue; }
           if (!ChartImport.detect(obj)) continue;
           charts.push({ file: e.name, entry: e, label: chartLabel(e.name, meta, obj) });
         }
@@ -670,7 +687,7 @@
         pkgCharts = { bytes, items: charts };
         const text = await zipText(bytes, charts[idx].entry);
         applyChart(
-          ChartImport.fromJSONText(text),
+          ChartImport.fromText(text),
           ` · ${charts[idx].file}` +
           (musicInfo ? ` · 音乐「${musicEntry.name}」${musicInfo.duration.toFixed(0)}s` : '')
         );
@@ -702,7 +719,7 @@
       try {
         const item = pkgCharts.items[idx];
         const text = await zipText(pkgCharts.bytes, item.entry);
-        applyChart(ChartImport.fromJSONText(text), ` · ${item.file}`);
+        applyChart(ChartImport.fromText(text), ` · ${item.file}`);
       } catch (err) {
         UI.toast('导入失败：' + (err && err.message ? err.message : err));
       }
@@ -771,7 +788,7 @@
         pkgCharts = null;
         UI.buildPresetOptions(null);
         setStageBackground(null);
-        applyChart(ChartImport.fromJSONText(text));
+        applyChart(ChartImport.fromText(text));
       } catch (err) {
         UI.toast('导入失败：' + err.message);
       }

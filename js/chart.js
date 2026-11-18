@@ -15,7 +15,7 @@ const ChartImport = (function () {
   const MAX_SLOTS = 8;        // 一拍最多几个音符
   const TIME_EPS = 1e-4;      // 同一时间的判定阈值（拍）
   const BPM_MIN = 4;          // 和 state.js 保持一致
-  const BPM_MAX = 2000;       // 超高 BPM 谱面（比如 999、1200）也要能读进来
+  const BPM_MAX = 12000;      // 上限放宽：谱面里有 1024、甚至 9999999 这种演出用的假 BPM
 
   /* ------------------------------------------------------------- 小工具 */
 
@@ -187,6 +187,152 @@ const ChartImport = (function () {
     };
   }
 
+  /* -------------------------------------------------------------- Arcaea */
+
+  /** 认一下是不是 .aff 文本：有 AudioOffset 头或者 timing(...) 语句 */
+  function looksLikeAFF(text) {
+    const head = String(text || '').slice(0, 4000);
+    return /(^|\n)\s*AudioOffset\s*:/i.test(head) || /(^|\n)\s*timing\s*\([^)]*\)/i.test(head);
+  }
+
+  /**
+   * Arcaea 的 .aff：纯文本，时间单位是毫秒。
+   *   AudioOffset:x       音乐整体前移 -x / 后移 +x 毫秒
+   *   timing(ms,bpm,beats)
+   *   (t,lane)            地面 Note（lane 1–4）
+   *   hold(t1,t2,lane)    Hold，只算头
+   *   arc(t1,t2,x1,x2,ease,y1,y2,color,fx,skyline)[arctap(t),...]
+   *   timinggroup(...){ ... };  组内自带 timing，noinput 那组是演出用的
+   */
+  function parseAFF(text) {
+    const lines = String(text || '').split(/\r?\n/);
+    let offsetMs = 0;
+    const timings = [];        // 主时间轴
+    const rawNotes = [];       // { ms, kind }
+    let groupDepth = 0;
+    let skipGroup = false;
+    let lastArc = null;        // 用来把首尾相接的 arc 段并成一条
+
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+
+      if (/^AudioOffset\s*:/i.test(line)) {
+        const m = line.match(/^AudioOffset\s*:\s*(-?\d+(?:\.\d+)?)/i);
+        if (m) offsetMs = Math.round(Number(m[1]));
+        continue;
+      }
+      if (/^TimingPointDensityFactor\s*:/i.test(line)) continue;
+
+      if (/^timinggroup\s*\(/i.test(line)) {
+        groupDepth++;
+        if (groupDepth === 1) skipGroup = /noinput/i.test(line);
+        continue;
+      }
+      if (groupDepth > 0 && /^\}\s*;?/.test(line)) {
+        groupDepth = Math.max(0, groupDepth - 1);
+        if (groupDepth === 0) skipGroup = false;
+        continue;
+      }
+
+      // timing(ms, bpm, beats)
+      const mt = line.match(/^timing\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/i);
+      if (mt) {
+        // 只有主时间轴的 timing 拿来算拍子；组内的流速不同，不参与
+        if (groupDepth === 0) {
+          const ms = Math.round(Number(mt[1]));
+          const raw = Number(mt[2]);
+          // 和 build() 用同一个范围夹：谱面里偶尔有 9999999 这种演出用的假 BPM，
+          // 不夹的话后面所有音符的拍号会飞出去（还会被页数上限截断）。
+          if (raw > 0) timings.push({ ms, bpm: Math.max(BPM_MIN, Math.min(BPM_MAX, raw)), rawBpm: raw });
+        }
+        continue;
+      }
+      if (skipGroup) continue;
+
+      // hold(t1,t2,lane)
+      const mh = line.match(/^hold\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*\d+\s*\)/i);
+      if (mh) {
+        rawNotes.push({ ms: Math.round(Number(mh[1])), kind: 'hold' });
+        continue;
+      }
+
+      // arc(...)：首尾相接的段并成一条，只在头上一击
+      const ma = line.match(/^arc\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,([^)]*)\)/i);
+      if (ma) {
+        const t1 = Math.round(Number(ma[1]));
+        const rest = ma[3].split(',');
+        // 参数顺序：x1,x2,ease,y1,y2,color,fx,skyline
+        const x1 = Number(rest[0]);
+        const x2 = Number(rest[1]);
+        const y1 = Number(rest[3]);
+        const y2 = Number(rest[4]);
+        const skyline = String(rest[7] || '').trim().toLowerCase() === 'true';
+
+        // skyline 为 true 的弧只是天空 Note 的判定线，本身不产生判定（官方物量为 0）
+        const prev = lastArc;
+        const joined = !skyline && prev && Math.abs(t1 - prev.t2) < 10 &&
+          Math.abs(y1 - prev.y2) < 0.001 && Math.abs(x1 - prev.x2) < 0.1;
+        if (!skyline && !joined) rawNotes.push({ ms: t1, kind: 'arc' });
+        lastArc = { t2: Math.round(Number(ma[2])), x2, y2 };
+        // arctap(...) = 天空 Note，每个都是一下
+        const taps = line.match(/\[([^\]]*)\]/);
+        if (taps) {
+          const re = /arctap\s*\(\s*(-?\d+(?:\.\d+)?)\s*\)/gi;
+          let m2;
+          while ((m2 = re.exec(taps[1]))) {
+            rawNotes.push({ ms: Math.round(Number(m2[1])), kind: 'arctap' });
+          }
+        }
+        continue;
+      }
+
+      // 地面 Note：(t,lane);
+      const mg = line.match(/^\(\s*(-?\d+(?:\.\d+)?)\s*,\s*\d+\s*\)\s*;?/);
+      if (mg) {
+        rawNotes.push({ ms: Math.round(Number(mg[1])), kind: 'tap' });
+      }
+    }
+
+    if (!rawNotes.length) throw new Error('这个 .aff 里没有可用的音符');
+    if (!timings.length) {
+      // 极端情况：没有主时间轴，就当 120 BPM
+      timings.push({ ms: 0, bpm: 120 });
+    }
+    timings.sort((a, b) => a.ms - b.ms);
+
+    // 毫秒 → 拍：按 timing 分段积分
+    const segs = [];
+    let beat = 0;
+    let prev = null;
+    timings.forEach((t) => {
+      if (prev) {
+        if (t.ms <= prev.ms) return;      // 同一时刻重复的 timing 只留第一条
+        beat += (t.ms - prev.ms) * prev.bpm / 60000;
+      }
+      segs.push({ ms: t.ms, beat, bpm: t.bpm });
+      prev = t;
+    });
+
+    const beatAt = (ms) => {
+      let seg = segs[0];
+      for (const s of segs) { if (s.ms <= ms) seg = s; else break; }
+      return Math.max(0, seg.beat + (ms - seg.ms) * seg.bpm / 60000);
+    };
+
+    const notes = rawNotes.map((n) => ({ beat: beatAt(n.ms), type: 1 }));
+
+    return {
+      format: 'aff',
+      label: 'Arcaea .aff',
+      bpmList: segs.map((s) => ({ beat: s.beat, bpm: s.bpm })),
+      notes,
+      meta: { name: '' },
+      // AudioOffset 为正表示物件时间比音乐晚 x ms → 音乐在谱面时间 0 时还差 x ms
+      offsetSec: -offsetMs / 1000,
+    };
+  }
+
   /* ------------------------------------------------------------ 时间分析 */
 
   /**
@@ -208,10 +354,18 @@ const ChartImport = (function () {
     });
 
     // 每拍收集「拍内位置」
+    // 先把拍号吸附到 1/64 拍：毫秒取整、浮点误差会让 2.0 变成 1.997，
+    // 那样会被算成"第 1 拍的 0.997 处"，再量化就掉到拍首，整整差一拍。
+    const SNAP = 1 / 64;
     const buckets = new Map();
     uniq.forEach((n) => {
-      const b = Math.floor(n.beat + 1e-9);
-      const off = n.beat - b;
+      const snapped = Math.round(n.beat / SNAP) * SNAP;
+      let b = Math.floor(snapped + 1e-9);
+      let off = snapped - b;
+      // 拍尾那 1/16 里的音（≥15/16）归到下一拍开头：
+      // 一拍只有 1/8 的格子，落在 0.94 附近的音放"7/8"和放"下一拍"误差差不多，
+      // 但归到下一拍不会让整拍错位，量化误差也更小。
+      if (off >= 15 / 16 - 1e-9) { b += 1; off = 0; }
       const arr = buckets.get(b) || [];
       if (!arr.some((o) => Math.abs(o - off) < TIME_EPS)) {
         arr.push(off);
@@ -248,9 +402,12 @@ const ChartImport = (function () {
           let err = 0;
           const slots = new Set();
           offsets.forEach((o) => {
+            // 误差要按"实际落到的格子"算：k 顶到 n 时会被夹回 n-1，
+            // 如果还用 k/n 当参照，就会以为它贴在拍尾、其实落到了拍首。
             const k = Math.round(o * n);
-            err = Math.max(err, Math.abs(o - k / n));
-            slots.add(Math.min(n - 1, Math.max(0, k)));
+            const slot = Math.min(n - 1, Math.max(0, k));
+            err = Math.max(err, Math.abs(o - slot / n));
+            slots.add(slot);
           });
           if (!chosen || err < chosen.err - 1e-9 ||
               (Math.abs(err - chosen.err) < 1e-9 && n < chosen.n)) {
@@ -312,7 +469,7 @@ const ChartImport = (function () {
       throw new Error('不是合法的 JSON 文件');
     }
     const fmt = detect(obj);
-    if (!fmt) throw new Error('认不出这个谱面格式（RPE / Phigros 官方 / Rizline 之外）');
+    if (!fmt) throw new Error('认不出这个谱面格式（RPE / Phigros / Rizline / Arcaea 之外）');
     let chart;
     if (fmt === 'rpe') chart = parseRPE(obj);
     else if (fmt === 'riz') chart = parseRiz(obj);
@@ -321,5 +478,17 @@ const ChartImport = (function () {
     return build(chart);
   }
 
-  return { fromJSONText, detect, parseRPE, parseFV3, parseRiz, build };
+  /** 主入口：任意文本（JSON 或 .aff）→ PolyBeat 工程片段 */
+  function fromText(text) {
+    if (looksLikeAFF(text)) {
+      const chart = parseAFF(text);
+      return build(chart);
+    }
+    return fromJSONText(text);
+  }
+
+  return {
+    fromJSONText, fromText, detect, looksLikeAFF,
+    parseRPE, parseFV3, parseRiz, parseAFF, build,
+  };
 })();

@@ -47,7 +47,7 @@ const Project = (function () {
 
   /** BPM 范围：下限 4（再低 MIDI 的 24 位速度就写不下了），上限 2000（够超高 BPM 谱面用） */
   const BPM_MIN = 4;
-  const BPM_MAX = 2000;
+  const BPM_MAX = 12000;
 
   /** BPM 保留两位小数，不要四舍五入——谱面里的 174.5 这类速度要原样保留 */
   function clampBpm(v) {
