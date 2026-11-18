@@ -47,9 +47,8 @@
     <select id="preset" class="preset-select" title="载入示例">
       <option value="">示例节奏…</option>
     </select>
-    <button id="btnMusic" class="btn btn-ghost" title="导入音乐（mp3 / ogg / wav / m4a…），和方块同步播放">音乐</button>
     <button id="btnSave" class="btn btn-ghost" title="导出工程 JSON">保存</button>
-    <button id="btnLoad" class="btn btn-ghost" title="导入：PolyBeat 工程、RPE / Phigros / Rizline 谱面、PEZ 压缩包、图片（当背景）——也可以直接把文件拖进窗口">导入</button>
+    <button id="btnLoad" class="btn btn-ghost" title="导入（可多选）：工程 / 谱面 / 压缩包 / 音乐 / 图片背景——也可以直接把文件拖进窗口">导入</button>
     <button id="btnMidi" class="btn btn-ghost" title="导出标准 MIDI">MIDI</button>
     <a id="btnGithub" class="btn btn-ghost btn-icon" href="https://github.com/jile-o1b/PolyBeat"
        target="_blank" rel="noopener noreferrer" title="GitHub 仓库：jile-o1b/PolyBeat" aria-label="打开 GitHub 仓库">
@@ -186,8 +185,7 @@
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<input id="fileInput" type="file" accept=".json,.rpe,.pec,.pez,.zip,.txt,.png,.jpg,.jpeg,.webp,.bmp,.gif,application/json,image/*" hidden>
-<input id="musicInput" type="file" accept="audio/*,.mp3,.ogg,.wav,.m4a,.flac,.aac,.opus" hidden>
+<input id="fileInput" type="file" multiple accept=".json,.rpe,.pec,.pez,.zip,.txt,.png,.jpg,.jpeg,.webp,.bmp,.gif,.mp3,.ogg,.oga,.wav,.m4a,.flac,.aac,.opus,application/json,audio/*,image/*" hidden>
 
 <script src="js/data.js"></script>
 <script src="js/hit.js"></script>

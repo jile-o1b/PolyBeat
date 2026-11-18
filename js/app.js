@@ -408,25 +408,30 @@
 
     function showMusicUI(info) {
       $('musicVolWrap').hidden = false;
-      $('btnMusic').title = `音乐：${info.name}（${Math.round(info.duration)} 秒）—— 点这里换一首`;
-      $('btnMusic').classList.add('has-music');
+      $('musicVol').title = `音乐：${info.name}（${Math.round(info.duration)} 秒）`;
     }
 
+    /** 载入伴奏，返回 Promise（方便多选导入时按顺序处理） */
     function loadMusicFile(file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        musicOffset = 0;           // 单独导入的音乐从谱面第 1 拍开始，不带谱面 offset
-        Synth.loadMusic(reader.result, file.name)
-          .then((info) => {
-            showMusicUI(info);
-            refreshCycle();          // 音乐比谱面长的话，循环长度要跟着变
-            UI.toast(`已导入音乐「${info.name}」，${info.duration.toFixed(1)} 秒`);
-          })
-          .catch((err) => {
-            UI.toast('音乐导入失败：' + (err && err.message ? err.message : err));
-          });
-      };
-      reader.readAsArrayBuffer(file);
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          musicOffset = 0;           // 单独导入的音乐从谱面第 1 拍开始，不带谱面 offset
+          Synth.loadMusic(reader.result, file.name)
+            .then((info) => {
+              showMusicUI(info);
+              refreshCycle();          // 音乐比谱面长的话，循环长度要跟着变
+              UI.toast(`已导入音乐「${info.name}」，${info.duration.toFixed(1)} 秒`);
+              resolve(info);
+            })
+            .catch((err) => {
+              UI.toast('音乐导入失败：' + (err && err.message ? err.message : err));
+              resolve(null);
+            });
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsArrayBuffer(file);
+      });
     }
 
     /** 把解析好的谱面装进工程，并把 offset 记下来给音乐用 */
@@ -619,11 +624,27 @@
       }
     }
 
+    function isAudioFile(file) {
+      return (file.type || '').startsWith('audio/') ||
+        /\.(mp3|ogg|oga|wav|m4a|flac|aac|opus|webm)$/i.test(file.name || '');
+    }
+
+    function isArchiveFile(file) {
+      return /\.(pez|zip)$/i.test(file.name || '');
+    }
+
+    function readTextFile(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => resolve('');
+        reader.readAsText(file);
+      });
+    }
+
     async function loadAnyFile(file) {
       const name = file.name || '';
-      const isAudio = (file.type || '').startsWith('audio/') ||
-        /\.(mp3|ogg|oga|wav|m4a|flac|aac|opus|webm)$/i.test(name);
-      if (isAudio) { loadMusicFile(file); return; }
+      if (isAudioFile(file)) { await loadMusicFile(file); return; }
 
       // 图片 → 当作谱面背景
       if (isImageFile(file)) {
@@ -635,59 +656,58 @@
       // 先看开头 4 个字节判断是不是 zip / pez
       let head = null;
       try { head = new Uint8Array(await file.slice(0, 4).arrayBuffer()); } catch (e) { head = null; }
-      if ((head && Zip.isZip(head)) || /\.(pez|zip)$/i.test(name)) {
-        importZip(file);
+      if ((head && Zip.isZip(head)) || isArchiveFile(file)) {
+        await importZip(file);
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        const text = String(reader.result);
-        let obj = null;
-        try { obj = JSON.parse(text); } catch (e) { /* 交给下面报错 */ }
+      const text = await readTextFile(file);
+      let obj = null;
+      try { obj = JSON.parse(text); } catch (e) { /* 交给下面报错 */ }
 
-        // 1) PolyBeat 自己的工程
-        if (obj && obj.app === 'PolyBeat') {
-          try {
-            stop();
-            Project.fromJSON(obj);
-            Synth.setHitVolume(Project.state.hitVol);
-            musicOffset = 0;
-            pkgCharts = null;
-            UI.buildPresetOptions(null);
-            setStageBackground(null);
-            UI.toast('工程已导入');
-          } catch (err) {
-            UI.toast('导入失败：' + err.message);
-          }
-          return;
-        }
-
-        // 2) 单文件谱面（RPE / Phigros / Rizline）
+      // 1) PolyBeat 自己的工程
+      if (obj && obj.app === 'PolyBeat') {
         try {
+          stop();
+          Project.fromJSON(obj);
+          Synth.setHitVolume(Project.state.hitVol);
+          musicOffset = 0;
           pkgCharts = null;
           UI.buildPresetOptions(null);
           setStageBackground(null);
-          applyChart(ChartImport.fromJSONText(text));
+          UI.toast('工程已导入');
         } catch (err) {
           UI.toast('导入失败：' + err.message);
         }
-      };
-      reader.readAsText(file);
+        return;
+      }
+
+      // 2) 单文件谱面（RPE / Phigros / Rizline）
+      try {
+        pkgCharts = null;
+        UI.buildPresetOptions(null);
+        setStageBackground(null);
+        applyChart(ChartImport.fromJSONText(text));
+      } catch (err) {
+        UI.toast('导入失败：' + err.message);
+      }
+    }
+
+    /** 一次导入多个文件：压缩包 → 谱面/工程 → 音乐 → 图片，依次套上去 */
+    async function loadAnyFiles(list) {
+      const files = [...(list || [])];
+      if (!files.length) return;
+      const rank = (f) => (isArchiveFile(f) ? 0 : isImageFile(f) ? 3 : isAudioFile(f) ? 2 : 1);
+      files.sort((a, b) => rank(a) - rank(b));
+      for (const f of files) await loadAnyFile(f);
+      if (files.length > 1) UI.toast(`已导入 ${files.length} 个文件`);
     }
 
     $('btnLoad').addEventListener('click', () => $('fileInput').click());
     $('fileInput').addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
+      const files = e.target.files ? [...e.target.files] : [];
       e.target.value = '';
-      if (file) loadAnyFile(file);
-    });
-
-    $('btnMusic').addEventListener('click', () => $('musicInput').click());
-    $('musicInput').addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      e.target.value = '';
-      if (file) loadMusicFile(file);
+      if (files.length) loadAnyFiles(files);
     });
 
     $('musicVol').addEventListener('input', (e) => {
@@ -695,12 +715,12 @@
       Synth.setMusicVolume(Number(e.target.value) / 100);
     });
 
-    // 拖进窗口也行
+    // 拖进窗口也行（可以一次拖多个）
     document.addEventListener('dragover', (e) => { e.preventDefault(); });
     document.addEventListener('drop', (e) => {
       e.preventDefault();
-      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (file) loadAnyFile(file);
+      const files = e.dataTransfer && e.dataTransfer.files ? [...e.dataTransfer.files] : [];
+      if (files.length) loadAnyFiles(files);
     });
 
     $('btnMidi').addEventListener('click', async () => {
